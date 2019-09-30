@@ -1,7 +1,8 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <dirent.h>
-#include "ls.h"
+
+#include "intcmds.h"
 
 
 void listDir(char* dirName){

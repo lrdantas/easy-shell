@@ -7,7 +7,8 @@
 #include<sys/wait.h> 
 #include<readline/readline.h> 
 #include<readline/history.h> 
-#include "ls.h"
+
+#include "intcmds.h"
   
 #define MAXCOM 80 // número maximo de letras a serem suportadas 
 #define MAXLIST 5 // numero maximo de comandos
@@ -45,12 +46,18 @@ printf("EEEEEEE AA   AA  SSSSS    YYY          SSSSS  HH   HH EEEEEEE LLLLLLL LL
 int takeInput(char* str) 
 { 
     char* buf; 
+    char ps1[1024];
     char* username = getenv("USER"); 
+    getcwd(ps1, 1024); 
+    strcat(ps1, "@");
+    strcat(ps1,username);
+
+ 
     
-    printf("%s", username);
+    printf("%s", ps1);
     buf = readline(" $ "); 
     if (strlen(buf) != 0) { 
-        add_history(buf); 
+        puthistory(buf);
         strcpy(str, buf); 
         return 0; 
     } else { 
@@ -73,42 +80,25 @@ void execArgs(char** parsed)
     pid_t pid = fork();  
   
     if (pid == -1) { 
-        printf("\nFailed forking child.."); 
+        printf("\nO fork falhou"); 
         return; 
     } else if (pid == 0) { 
         if (execvp(parsed[0], parsed) < 0) { 
-            printf("\nCould not execute command.."); 
+            printf("\nNao pode executar o programa\n"); 
         } 
         exit(0); 
     } else { 
-        // waiting for child to terminate 
+        // esperando o processo do filho terminar. 
         wait(NULL);  
         return; 
     } 
 } 
   
   
-// Help command builtin 
-void openHelp() 
-{ 
-    puts("\n***WELCOME TO MY SHELL HELP***"
-        "\nCopyright @ Suprotik Dey"
-        "\n-Use the shell at your own risk..."
-        "\nList of Commands supported:"
-        "\n>cd"
-        "\n>ls"
-        "\n>exit"
-        "\n>all other general commands available in UNIX shell"
-        "\n>pipe handling"
-        "\n>improper space handling"); 
-  
-    return; 
-} 
-  
 // Function to execute builtin commands 
-int ownCmdHandler(char** parsed) 
+int ownCmdHandler(char** parsed, char **envp) 
 { 
-    int NoOfOwnCmds = 6, i, switchOwnArg = 0; 
+    int NoOfOwnCmds = 9, i, switchOwnArg = 0; 
     char* ListOfOwnCmds[NoOfOwnCmds]; 
     char* username; 
   
@@ -118,6 +108,10 @@ int ownCmdHandler(char** parsed)
     ListOfOwnCmds[3] = "hello";
     ListOfOwnCmds[4] = "pwd"; 
     ListOfOwnCmds[5] = "dir"; 
+    ListOfOwnCmds[6] = "history"; 
+    ListOfOwnCmds[7] = "echo"; 
+    ListOfOwnCmds[8] = "declare"; 
+    ListOfOwnCmds[9] = "unset"; 
   
     for (i = 0; i < NoOfOwnCmds; i++) { 
         if (strcmp(parsed[0], ListOfOwnCmds[i]) == 0) { 
@@ -131,17 +125,17 @@ int ownCmdHandler(char** parsed)
         printf("\nGoodbye\n"); 
         exit(0); 
     case 2: 
-        chdir(parsed[1]); //Chamada de sistema para mudança de repositorio.
+       if (chdir(parsed[1]) != 0 && parsed[1] != NULL)
+            perror("error "); 
+        else
+            chdir(parsed[1]); //Chamada de sistema para mudança de repositorio.
         return 1; 
     case 3: 
         openHelp(); 
         return 1; 
     case 4: 
         username = getenv("USER"); 
-        printf("\nHello %s.\nMind that this is "
-            "not a place to play around."
-            "\nUse help to know more..\n", 
-            username); 
+        printf("\nOla %s.\n Seja Bem vindo!", username); 
         return 1; 
     case 5: 
         printDir(); 
@@ -152,6 +146,18 @@ int ownCmdHandler(char** parsed)
         else
             listDir(parsed[1]); 
         printf("\n");           
+        return 1; 
+    case 7: 
+        history(parsed[1]); 
+        return 1; 
+    case 8: 
+        printf("%s\n", parsed[1]);
+        return 1; 
+    case 9: 
+        setvar(parsed[1]); 
+        return 1; 
+    case 10: 
+        unsetvar(parsed[1]); 
         return 1; 
     default:        
         break; 
@@ -176,20 +182,21 @@ void parseSpace(char* str, char** parsed)
     } 
 } 
   
-int processString(char* str, char** parsed) 
+int processString(char* str, char** parsed, char **envp) 
 { 
 
     parseSpace(str, parsed); 
  
-    if(ownCmdHandler(parsed) == 1)
+    if(ownCmdHandler(parsed, envp) == 1)
         return 0;
     else
         return 1; 
  
 } 
   
-int main() 
+int main(int argc, char **argv, char **envp) 
 { 
+
     char inputString[MAXCOM], *parsedArgs[MAXLIST]; 
     int execFlag = 0; 
     init_shell(); 
@@ -202,7 +209,7 @@ int main()
             continue; 
         // process 
         execFlag = processString(inputString, 
-        parsedArgs); 
+        parsedArgs, envp); 
         // execflag returns zero if there is no command 
         // or it is a builtin command, 
         // 1 if it is a simple command 

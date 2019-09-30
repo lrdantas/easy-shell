@@ -1,1 +1,0 @@
-void listDir(char *dirName);
